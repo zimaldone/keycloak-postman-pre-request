@@ -6,26 +6,48 @@ var clientSecret = ""; // the secret you copied earlier
 var username     = ""; // the username of the user you want to test with
 var password     = ""; // the password of the user you want to test with
 
-// creating the request URL
-var url  = `${server}/auth/realms/${realm}/protocol/openid-connect/token`;
-// creating the body of the request
-var data = `grant_type=${grantType}&client_id=${clientId}&username=${username}&password=${password}&client_secret=${clientSecret}`;
+var url = `${server}/auth/realms/${realm}/protocol/openid-connect/token`;
+var data = `grant_type=${grantType}&client_id=${clientId}&username=${username}&password=${password}`;
+//&client_secret=${clientSecret}`;  --> append this part to the above line if your setup requires client_secret
 
-// request to Keycloak
-// read more about this here: https://www.keycloak.org/docs/latest/authorization_services/#_service_overview
-pm.sendRequest({
-    url: url,
-    method: 'POST',
-    header: { 'Content-Type': 'application/x-www-form-urlencoded'},
-    body: {
-        mode: 'raw',
-        raw: data
+const old_token = pm.variables.get("token");
+var oldTokenJson;
+var tokenExpired;
+
+if (typeof (old_token) !== "undefined" && old_token !== null) {
+    oldTokenJson = parseJwt(pm.variables.get("token"));
+    if (oldTokenJson.exp >= Math.floor(Date.now() / 1000)) {
+        tokenExpired = false;
+        console.log("Token is still valid, it will expire on: " + new Date(oldTokenJson.exp * 1000))
+    } else {
+        tokenExpired = true;
+        console.log("Token expired " + oldTokenJson.exp + ", going to refresh it")
     }
-},  function(err, response) {
-    // Set the environment variable for token
-    var response_json = response.json();
-    var token = response_json.access_token;
-    pm.environment.set('token', token);
-    // You can open up the console in Postman with Alt + Ctrl + C
-    console.log(token);
-});
+}
+
+if (tokenExpired || (typeof (oldTokenJson) === "undefined" && oldTokenJson === null)) {
+    pm.sendRequest({
+        url: url,
+        method: 'POST',
+        header: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: {
+            mode: 'raw',
+            raw: data
+        }
+    }, function (err, response) {
+        var response_json = response.json();
+        var token = response_json.access_token;
+        pm.environment.set('token', token);
+        console.log(token);
+    });
+}
+
+function parseJwt(token) {
+    var base64Url = token.split('.')[1];
+    var base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    var jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    return JSON.parse(jsonPayload);
+};

@@ -14,7 +14,7 @@ const old_token = pm.variables.get("token");
 var oldTokenJson;
 var tokenExpired;
 
-if (typeof (old_token) !== "undefined" && old_token !== null) {
+if (typeof (old_token) !== "undefined" && old_token !== null && old_token) {
     oldTokenJson = parseJwt(pm.variables.get("token"));
     if (oldTokenJson.exp >= Math.floor(Date.now() / 1000)) {
         tokenExpired = false;
@@ -25,7 +25,7 @@ if (typeof (old_token) !== "undefined" && old_token !== null) {
     }
 }
 
-if (tokenExpired || (typeof (oldTokenJson) === "undefined" && oldTokenJson === null)) {
+if (tokenExpired || !oldTokenJson || (typeof (oldTokenJson) === "undefined" && (oldTokenJson === null || (typeof (oldTokenJson) === "undefined")))) {
     pm.sendRequest({
         url: url,
         method: 'POST',
